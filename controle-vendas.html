@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Vendas</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f8f5ff; color: #1e1e2e; min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 20px 16px 0; color: white; }
+  .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .header-title { font-size: 20px; font-weight: 700; }
+  .header-sub { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+  .btn-nova { background: white; color: #7c3aed; border: none; border-radius: 20px; padding: 8px 18px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { background: transparent; color: white; border: none; border-radius: 8px 8px 0 0; padding: 8px 20px; font-weight: 600; font-size: 14px; cursor: pointer; opacity: 0.8; }
+  .tab.active { background: white; color: #7c3aed; opacity: 1; }
+
+  /* CARDS */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+  .card { background: white; border-radius: 12px; padding: 14px 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+  .card-icon { font-size: 18px; margin-bottom: 4px; }
+  .card-value { font-size: 14px; font-weight: 700; }
+  .card-label { font-size: 10px; color: #888; margin-top: 2px; }
+
+  /* FILTRO MÊS */
+  .mes-bar { background: white; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .mes-bar-title { font-size: 12px; font-weight: 600; color: #888; margin-bottom: 8px; }
+  .mes-scroll { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .mes-scroll::-webkit-scrollbar { display: none; }
+  .mes-btn { flex-shrink: 0; font-size: 12px; padding: 5px 14px; border-radius: 20px; border: 1.5px solid #e5e7eb; background: white; color: #666; cursor: pointer; white-space: nowrap; }
+  .mes-btn.active { border-color: #7c3aed; background: #7c3aed; color: white; font-weight: 700; }
+  .cards-mes { display: none; background: #f3e8ff; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; }
+  .cards-mes.show { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+  .card-mes { text-align: center; }
+  .card-mes-val { font-size: 14px; font-weight: 700; }
+  .card-mes-label { font-size: 10px; color: #666; margin-top: 2px; }
+
+  /* FILTROS */
+  .filtros { background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .search-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; font-size: 14px; margin-bottom: 10px; outline: none; }
+  .filtro-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filtro-btn { font-size: 12px; padding: 4px 12px; border-radius: 20px; border: 1.5px solid #e5e7eb; background: white; color: #666; cursor: pointer; font-weight: 400; }
+  .filtro-btn.active { border-color: #7c3aed; background: #f3e8ff; color: #7c3aed; font-weight: 700; }
+
+  /* LISTA */
+  .count-label { font-size: 12px; color: #888; margin-bottom: 8px; padding-left: 4px; }
+  .lista { display: flex; flex-direction: column; gap: 8px; }
+  .venda-card { background: white; border-radius: 12px; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); border-left: 4px solid #22c55e; }
+  .venda-card.em-aberto { border-left-color: #eab308; }
+  .venda-card.atrasado { border-left-color: #ef4444; }
+  .venda-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .venda-info { flex: 1; }
+  .venda-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+  .venda-nome { font-weight: 700; font-size: 15px; }
+  .badge-cat { font-size: 11px; background: #f3e8ff; color: #7c3aed; padding: 2px 8px; border-radius: 20px; }
+  .badge-status { font-size: 11px; padding: 2px 8px; border-radius: 20px; cursor: pointer; font-weight: 600; }
+  .badge-pago { background: #dcfce7; color: #15803d; }
+  .badge-em-aberto { background: #fef9c3; color: #a16207; }
+  .badge-atrasado { background: #fee2e2; color: #b91c1c; }
+  .venda-produto { font-size: 13px; color: #555; }
+  .venda-data { font-size: 12px; color: #aaa; margin-top: 2px; }
+  .venda-valores { text-align: right; min-width: 90px; }
+  .venda-total { font-weight: 700; font-size: 15px; color: #7c3aed; }
+  .venda-lucro { font-size: 12px; color: #15803d; margin-top: 2px; }
+  .venda-margem { font-size: 11px; color: #888; }
+  .venda-acoes { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+  .btn-editar { font-size: 12px; padding: 4px 12px; border-radius: 8px; border: 1.5px solid #7c3aed; color: #7c3aed; background: white; cursor: pointer; }
+  .btn-excluir { font-size: 12px; padding: 4px 12px; border-radius: 8px; border: 1.5px solid #ef4444; color: #ef4444; background: white; cursor: pointer; }
+  .empty { text-align: center; color: #aaa; padding: 32px; }
+
+  /* RESUMO */
+  .resumo-section { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px; }
+  .resumo-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; }
+  .status-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; }
+  .status-label { font-weight: 600; }
+  .status-count { font-size: 12px; color: #888; margin-left: 8px; }
+  .cat-row { margin-bottom: 12px; }
+  .cat-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .cat-nome { font-size: 13px; font-weight: 600; }
+  .cat-valor { font-size: 13px; color: #7c3aed; font-weight: 700; }
+  .progress-bg { background: #f3e8ff; border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-fill { background: #7c3aed; height: 100%; border-radius: 4px; }
+  .cat-sub { font-size: 11px; color: #888; margin-top: 2px; }
+  .cliente-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f3f4f6; }
+  .cliente-nome { font-size: 14px; }
+  .cliente-valor { font-weight: 700; color: #7c3aed; font-size: 14px; }
+  .cliente-count { font-size: 11px; color: #aaa; margin-left: 6px; }
+
+  /* MODAL */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: flex-end; }
+  .overlay.show { display: flex; }
+  .modal { background: white; width: 100%; border-radius: 20px 20px 0 0; padding: 24px 20px 32px; max-height: 92vh; overflow-y: auto; }
+  .modal-title { font-weight: 700; font-size: 17px; margin-bottom: 20px; color: #7c3aed; }
+  .form-group { margin-bottom: 12px; }
+  .form-label { font-size: 13px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+  .form-input { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; }
+  .form-select { width: 100%; border: 1.5px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; font-size: 14px; background: white; }
+  .form-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .preview-box { background: #f3e8ff; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; display: none; }
+  .preview-box.show { display: block; }
+  .status-btns { display: flex; gap: 8px; }
+  .status-btn { flex: 1; padding: 8px 4px; border-radius: 8px; border: 2px solid #e5e7eb; background: white; color: #888; font-size: 12px; cursor: pointer; }
+  .status-btn.active-pago { border-color: #15803d; background: #dcfce7; color: #15803d; font-weight: 700; }
+  .status-btn.active-em-aberto { border-color: #a16207; background: #fef9c3; color: #a16207; font-weight: 700; }
+  .status-btn.active-atrasado { border-color: #b91c1c; background: #fee2e2; color: #b91c1c; font-weight: 700; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-cancelar { flex: 1; padding: 12px; border-radius: 10px; border: 1.5px solid #e5e7eb; background: white; color: #888; font-weight: 600; cursor: pointer; font-size: 14px; }
+  .btn-salvar { flex: 2; padding: 12px; border-radius: 10px; border: none; background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; font-weight: 700; font-size: 15px; cursor: pointer; }
+
+  /* CONFIRM */
+  .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .confirm-overlay.show { display: flex; }
+  .confirm-box { background: white; border-radius: 16px; padding: 24px; max-width: 320px; width: 100%; }
+  .confirm-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .confirm-sub { font-size: 14px; color: #666; margin-bottom: 20px; }
+  .confirm-btns { display: flex; gap: 10px; }
+  .btn-nao { flex: 1; padding: 10px; border-radius: 8px; border: 1.5px solid #e5e7eb; background: white; cursor: pointer; font-size: 14px; }
+  .btn-sim { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #ef4444; color: white; font-weight: 700; cursor: pointer; font-size: 14px; }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 16px 12px; }
+  .view { display: none; }
+  .view.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div style="max-width:900px;margin:0 auto;">
+    <div class="header-top">
+      <div>
+        <div class="header-title">💜 Controle de Vendas</div>
+        <div class="header-sub">Minhas vendas e lucros</div>
+      </div>
+      <button class="btn-nova" onclick="abrirNova()">+ Nova Venda</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="trocarView('vendas', this)">📋 Vendas</button>
+      <button class="tab" onclick="trocarView('resumo', this)">📊 Resumo</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- CARDS -->
+  <div class="cards">
+    <div class="card" style="border-top:3px solid #7c3aed">
+      <div class="card-icon">💰</div>
+      <div class="card-value" style="color:#7c3aed" id="card-total">R$ 0,00</div>
+      <div class="card-label">Total Vendido</div>
+    </div>
+    <div class="card" style="border-top:3px solid #15803d">
+      <div class="card-icon">📈</div>
+      <div class="card-value" style="color:#15803d" id="card-lucro">R$ 0,00</div>
+      <div class="card-label">Lucro Total</div>
+    </div>
+    <div class="card" style="border-top:3px solid #a16207">
+      <div class="card-icon">⏳</div>
+      <div class="card-value" style="color:#a16207" id="card-receber">R$ 0,00</div>
+      <div class="card-label">A Receber</div>
+    </div>
+  </div>
+
+  <!-- VIEW VENDAS -->
+  <div class="view active" id="view-vendas">
+    <div class="mes-bar">
+      <div class="mes-bar-title">📅 Filtrar por mês</div>
+      <div class="mes-scroll" id="mes-scroll"></div>
+    </div>
+    <div class="cards-mes" id="cards-mes">
+      <div class="card-mes">
+        <div class="card-mes-val" style="color:#7c3aed" id="mes-total">—</div>
+        <div class="card-mes-label">Vendido</div>
+      </div>
+      <div class="card-mes">
+        <div class="card-mes-val" style="color:#15803d" id="mes-lucro">—</div>
+        <div class="card-mes-label">Lucro</div>
+      </div>
+      <div class="card-mes">
+        <div class="card-mes-val" style="color:#a16207" id="mes-qtd">—</div>
+        <div class="card-mes-label">Vendas</div>
+      </div>
+    </div>
+    <div class="filtros">
+      <input class="search-input" id="search" placeholder="🔍 Buscar cliente ou produto..." oninput="renderLista()">
+      <div class="filtro-btns">
+        <button class="filtro-btn active" onclick="setFiltro('TODOS', this)">Todos</button>
+        <button class="filtro-btn" onclick="setFiltro('PAGO', this)">✓ Pago</button>
+        <button class="filtro-btn" onclick="setFiltro('EM ABERTO', this)">⏳ Em Aberto</button>
+        <button class="filtro-btn" onclick="setFiltro('ATRASADO', this)">⚠ Atrasado</button>
+      </div>
+    </div>
+    <div class="count-label" id="count-label"></div>
+    <div class="lista" id="lista"></div>
+  </div>
+
+  <!-- VIEW RESUMO -->
+  <div class="view" id="view-resumo">
+    <div class="resumo-section">
+      <div class="resumo-title">💰 Situação das Cobranças</div>
+      <div id="resumo-status"></div>
+    </div>
+    <div class="resumo-section">
+      <div class="resumo-title">📦 Vendas por Categoria</div>
+      <div id="resumo-cats"></div>
+    </div>
+    <div class="resumo-section">
+      <div class="resumo-title">⭐ Top Clientes</div>
+      <div id="resumo-clientes"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FORM -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">➕ Nova Venda</div>
+    <div class="form-group">
+      <label class="form-label">Data</label>
+      <input class="form-input" type="date" id="f-data">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Cliente</label>
+      <input class="form-input" type="text" id="f-cliente" placeholder="Nome da cliente">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Produto</label>
+      <input class="form-input" type="text" id="f-produto" placeholder="Ex: Kit Capilar">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Categoria</label>
+      <select class="form-select" id="f-categoria">
+        <option>Produto Capilar</option>
+        <option>Produto de pele</option>
+        <option>produto intimo</option>
+        <option>calçados</option>
+        <option>Acessório</option>
+        <option>Outro</option>
+      </select>
+    </div>
+    <div class="form-grid3">
+      <div>
+        <label class="form-label">Custo Unit.</label>
+        <input class="form-input" type="number" id="f-custo" placeholder="0,00" step="0.01" min="0" oninput="atualizarPreview()">
+      </div>
+      <div>
+        <label class="form-label">Venda Unit.</label>
+        <input class="form-input" type="number" id="f-venda" placeholder="0,00" step="0.01" min="0" oninput="atualizarPreview()">
+      </div>
+      <div>
+        <label class="form-label">Qtd.</label>
+        <input class="form-input" type="number" id="f-qtd" placeholder="1" min="1" value="1" oninput="atualizarPreview()">
+      </div>
+    </div>
+    <div class="preview-box" id="preview-box">
+      Venda total: <strong id="prev-total"></strong> &nbsp;
+      Lucro: <strong id="prev-lucro" style="color:#15803d"></strong> &nbsp;
+      Margem: <strong id="prev-margem"></strong>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <div class="status-btns">
+        <button class="status-btn active-pago" id="sbtn-pago" onclick="setStatus('PAGO')">✓ Pago</button>
+        <button class="status-btn" id="sbtn-em-aberto" onclick="setStatus('EM ABERTO')">⏳ Em Aberto</button>
+        <button class="status-btn" id="sbtn-atrasado" onclick="setStatus('ATRASADO')">⚠ Atrasado</button>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-salvar" id="btn-salvar" onclick="salvar()">Adicionar Venda</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div class="confirm-title">Excluir venda?</div>
+    <div class="confirm-sub">Esta ação não pode ser desfeita.</div>
+    <div class="confirm-btns">
+      <button class="btn-nao" onclick="fecharConfirm()">Cancelar</button>
+      <button class="btn-sim" onclick="confirmarDelete()">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = v => (v*100).toFixed(1) + '%';
+
+const RAW = [
+  ["2026-01-24","Adriana","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-03-31","Aline","Produto Capilar","Kit Capilar",18,30,2,"PAGO"],
+  ["2026-02-03","Ana Claudia","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-03-29","Ana Claudia","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-04-02","Antonia","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-04-01","Betania","Produto Capilar","Kit Capilar",8,16,1,"PAGO"],
+  ["2026-03-29","Cleidiane","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-01-26","client.Jack","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-01-25","Rita","Produto Capilar","Kit Capilar",23,50,7,"PAGO"],
+  ["2026-03-27","Rita","Produto Capilar","Kit Capilar",18,30,2,"PAGO"],
+  ["2026-03-27","Ednancy","Produto Capilar","Protetor Termico",13,25,1,"PAGO"],
+  ["2026-03-11","Flavia","Produto Capilar","Kit Capilar",18,50,1,"PAGO"],
+  ["2026-03-29","Genilda","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-01-26","Kesia","Produto Capilar","Kit Capilar",23,50,2,"PAGO"],
+  ["2026-01-26","Kesia","Produto Capilar","Máscara",17,30,1,"PAGO"],
+  ["2026-03-17","Kesia","Produto Capilar","Óleo Reparador",15,25,1,"PAGO"],
+  ["2026-04-01","Kesia","Produto de pele","protetor solar",12.98,25,1,"PAGO"],
+  ["2026-04-01","Kesia","Produto Capilar","Óleo Reparador",8,10,1,"PAGO"],
+  ["2026-01-30","Lara","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-03-23","M.Francisca","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-03-23","Marlete","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-02-06","Neucilene","Produto Capilar","Kit Capilar",18,60,1,"PAGO"],
+  ["2026-02-06","Neucilene","Produto Capilar","Kit Capilar",18,40,1,"PAGO"],
+  ["2026-02-06","Neucilene","Produto Capilar","Óleo Reparador",15,25,1,"PAGO"],
+  ["2026-01-24","Patrícia","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-02-28","Patrícia","Produto Capilar","Protetor Termico",10,20,1,"PAGO"],
+  ["2026-04-01","Patrícia","Produto Capilar","Óleo Reparador",9,18,1,"PAGO"],
+  ["2026-03-27","Regilene","Produto Capilar","Protetor Termico",13,25,1,"PAGO"],
+  ["2026-03-30","Rosilene","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-04-02","Socorro","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-02-28","Vanusa","Produto Capilar","Kit Capilar",19,50,1,"PAGO"],
+  ["2026-02-10","Vilma","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-04-07","Regilene","Produto Capilar","Kit Capilar",12,24,3,"PAGO"],
+  ["2026-04-08","Rita","Produto Capilar","Kit Capilar",18,50,1,"PAGO"],
+  ["2026-04-10","Socorro Juv.","Produto de pele","Esfoliante",9,15,2,"PAGO"],
+  ["2026-04-10","Socorro Juv.","produto intimo","sabonete intimo",3,7,2,"PAGO"],
+  ["2026-04-10","Ivone","produto intimo","sabonete intimo",3,7,1,"ATRASADO"],
+  ["2026-04-10","Hilda","produto intimo","sabonete intimo",3,7,1,"PAGO"],
+  ["2026-04-10","Hilda","Produto de pele","Esfoliante",9,15,1,"PAGO"],
+  ["2026-04-13","Liliane","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-04-11","Aldenira","Produto Capilar","Kit Capilar",19.83,50,1,"PAGO"],
+  ["2026-06-14","Francisca","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-04-14","Francisca","Produto Capilar","Protetor Termico",15,25,1,"PAGO"],
+  ["2026-04-21","Rosilene","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-05-15","mãe Daniele","Produto de pele","Esfoliante",6,15,1,"PAGO"],
+  ["2026-04-21","Socorro Juv.","Produto de pele","Esfoliante",6,15,3,"PAGO"],
+  ["2026-04-21","Socorro Juv.","produto intimo","sabonete intimo",3.55,7,3,"PAGO"],
+  ["2026-04-24","Patrícia","Produto Capilar","Kit Capilar",24.9,50,1,"PAGO"],
+  ["2026-04-28","Kesia","Produto Capilar","aplique cabelo",25,50,1,"PAGO"],
+  ["2026-04-28","Kesia","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-04-28","Kesia","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-04-28","Kesia","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-04-28","Vanilton","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-04-28","Alvani","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-04-28","Aldenira","calçados","sandália",10,30,1,"PAGO"],
+  ["2026-04-28","Rita","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-04-28","Regilene","Produto Capilar","Kit Capilar",19,55,1,"PAGO"],
+  ["2026-04-28","Regilene","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-04-28","Regilene","Produto Capilar","Kit Capilar",12,24,1,"PAGO"],
+  ["2026-04-28","Regilene","Produto Capilar","Protetor Termico",13,25,2,"PAGO"],
+  ["2026-04-28","Regilene","produto intimo","sabonete intimo",3.55,7,2,"PAGO"],
+  ["2026-04-29","Kesia","Acessório","chaveiro",4.75,5,1,"PAGO"],
+  ["2026-04-29","Ester","Acessório","chaveiro",4.75,5,1,"PAGO"],
+  ["2026-04-30","Kesia","Acessório","chaveiro",4.75,5,2,"PAGO"],
+  ["2026-05-03","Kesia","Produto de pele","kit pele",33.87,40,1,"PAGO"],
+  ["2026-05-03","Patrícia","Produto Capilar","Kit Capilar",12,24,1,"PAGO"],
+  ["2026-05-08","Kesia","Produto Capilar","cesta",22,40,1,"PAGO"],
+  ["2026-05-08","Kesia","Produto Capilar","cesta",22,40,1,"PAGO"],
+  ["2026-05-08","Neucilene","calçados","sandália",10,25,1,"PAGO"],
+  ["2026-05-08","Neucilene","Acessório","chaveiro",4.75,5,1,"PAGO"],
+  ["2026-05-08","Aline","Produto Capilar","cesta",29.5,50,1,"PAGO"],
+  ["2026-05-10","Aline","Produto Capilar","cesta",29.5,45,1,"EM ABERTO"],
+  ["2026-05-10","Vanilton","Produto Capilar","cesta",22,45,1,"PAGO"],
+  ["2026-05-10","Vânia","Produto Capilar","cesta",24.225,40,1,"PAGO"],
+  ["2026-05-10","Vânia","Produto Capilar","cesta",24.23,40,1,"EM ABERTO"],
+  ["2026-05-15","Aline","produto intimo","sabonete intimo",3.55,7,1,"PAGO"],
+  ["2026-05-15","Aline","Acessório","pulseira",0.9,5,1,"PAGO"],
+  ["2026-05-16","Aline","Acessório","pulseira",0.9,5,1,"EM ABERTO"],
+  ["2026-05-19","Flavia","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-05-21","Bia","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-05-23","Milena","Produto Capilar","Kit Capilar",18,30,1,"PAGO"],
+  ["2026-05-25","Leninha","Produto Capilar","Kit Capilar",12,25,1,"EM ABERTO"],
+  ["2026-05-28","Kesia","Produto de pele","sacola presenteável",27,47,1,"EM ABERTO"],
+  ["2026-05-28","Kesia","Produto de pele","perfume",12,20,1,"EM ABERTO"],
+  ["2026-05-30","Rita","Produto Capilar","Kit Capilar",23,50,2,"PAGO"],
+  ["2026-06-01","Rita","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-06-02","Lara","Acessório","piranha",3.8,5,10,"EM ABERTO"],
+  ["2026-06-03","Aline","Produto de pele","Sabonete",7.9,12,1,"EM ABERTO"],
+  ["2026-06-03","Aline","Produto de pele","Esfoliante",9.3,12,1,"EM ABERTO"],
+  ["2026-06-03","Rita","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-06-03","Ednancy","Produto de pele","Sabonete",7.9,12,1,"EM ABERTO"],
+  ["2026-06-03","Ednancy","produto intimo","sabonete intimo",3.55,7,1,"EM ABERTO"],
+  ["2026-06-06","Layane","Produto Capilar","Kit Capilar",23,50,1,"EM ABERTO"],
+  ["2026-06-08","Fernanda","Produto Capilar","Kit Capilar",23,50,1,"EM ABERTO"],
+  ["2026-06-08","Fernanda","Produto Capilar","Óleo Reparador",9,18,1,"EM ABERTO"],
+  ["2026-06-09","Rita","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+  ["2026-06-11","amig.patinha","Produto Capilar","Kit Capilar",23,50,1,"PAGO"],
+];
+
+let vendas = RAW.map((r, i) => {
+  const custoTotal = r[4]*r[6], vendaTotal = r[5]*r[6], lucro = vendaTotal-custoTotal;
+  return { id: i+1, data: r[0], cliente: r[1], categoria: r[2], produto: r[3], custoUnit: r[4], vendaUnit: r[5], quantidade: r[6], status: r[7], custoTotal, vendaTotal, lucro, margem: vendaTotal>0?lucro/vendaTotal:0 };
+});
+let nextId = vendas.length + 1;
+let filtroStatus = 'TODOS';
+let filtroMes = 'TODOS';
+let editandoId = null;
+let deletandoId = null;
+let formStatus = 'PAGO';
+
+const MESES_NOME = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function getMesesDisponiveis() {
+  const set = new Set(vendas.map(v => v.data.substring(0,7)));
+  return ['TODOS', ...Array.from(set).sort()];
+}
+
+function renderMesBar() {
+  const meses = getMesesDisponiveis();
+  document.getElementById('mes-scroll').innerHTML = meses.map(m => {
+    let label = m === 'TODOS' ? 'Todos' : (() => {
+      const [ano, mes] = m.split('-');
+      return MESES_NOME[+mes-1] + '/' + ano.slice(2);
+    })();
+    return `<button class="mes-btn${filtroMes===m?' active':''}" onclick="setFiltroMes('${m}', this)">${label}</button>`;
+  }).join('');
+}
+
+function setFiltroMes(mes, btn) {
+  filtroMes = mes;
+  renderMesBar();
+  renderCards();
+  renderLista();
+  const box = document.getElementById('cards-mes');
+  if (mes === 'TODOS') {
+    box.classList.remove('show');
+  } else {
+    box.classList.add('show');
+    const grupo = vendas.filter(v => v.data.startsWith(mes));
+    document.getElementById('mes-total').textContent = fmt(grupo.reduce((a,b)=>a+b.vendaTotal,0));
+    document.getElementById('mes-lucro').textContent = fmt(grupo.reduce((a,b)=>a+b.lucro,0));
+    document.getElementById('mes-qtd').textContent = grupo.length + ' venda(s)';
+  }
+}
+
+function calcRow(v) {
+  const custoTotal = v.custoUnit*v.quantidade, vendaTotal = v.vendaUnit*v.quantidade, lucro = vendaTotal-custoTotal;
+  return { ...v, custoTotal, vendaTotal, lucro, margem: vendaTotal>0?lucro/vendaTotal:0 };
+}
+
+function trocarView(nome, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-'+nome).classList.add('active');
+  btn.classList.add('active');
+  if (nome === 'resumo') renderResumo();
+}
+
+function setFiltro(status, btn) {
+  filtroStatus = status;
+  document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLista();
+}
+
+function renderCards() {
+  const base = filtroMes === 'TODOS' ? vendas : vendas.filter(v => v.data.startsWith(filtroMes));
+  const total = base.reduce((a,b)=>a+b.vendaTotal,0);
+  const lucro = base.reduce((a,b)=>a+b.lucro,0);
+  const receber = base.filter(s=>s.status==='EM ABERTO'||s.status==='ATRASADO').reduce((a,b)=>a+b.vendaTotal,0);
+  document.getElementById('card-total').textContent = fmt(total);
+  document.getElementById('card-lucro').textContent = fmt(lucro);
+  document.getElementById('card-receber').textContent = fmt(receber);
+}
+
+function renderLista() {
+  const search = document.getElementById('search').value.toLowerCase();
+  let lista = vendas.filter(s => {
+    if (filtroMes !== 'TODOS' && !s.data.startsWith(filtroMes)) return false;
+    if (filtroStatus !== 'TODOS' && s.status !== filtroStatus) return false;
+    if (search && !s.cliente.toLowerCase().includes(search) && !s.produto.toLowerCase().includes(search)) return false;
+    return true;
+  }).slice().reverse();
+
+  document.getElementById('count-label').textContent = lista.length + ' venda(s) encontrada(s)';
+
+  const statusClass = { 'PAGO': '', 'EM ABERTO': 'em-aberto', 'ATRASADO': 'atrasado' };
+  const badgeClass = { 'PAGO': 'badge-pago', 'EM ABERTO': 'badge-em-aberto', 'ATRASADO': 'badge-atrasado' };
+  const statusLabel = { 'PAGO': '✓ Pago', 'EM ABERTO': '⏳ Em Aberto', 'ATRASADO': '⚠ Atrasado' };
+
+  const html = lista.length === 0 ? '<div class="empty">Nenhuma venda encontrada</div>' :
+    lista.map(s => `
+      <div class="venda-card ${statusClass[s.status]}">
+        <div class="venda-top">
+          <div class="venda-info">
+            <div class="venda-badges">
+              <span class="venda-nome">${s.cliente}</span>
+              <span class="badge-cat">${s.categoria}</span>
+              <span class="badge-status ${badgeClass[s.status]}" onclick="toggleStatus(${s.id})" title="Clique para mudar status">${statusLabel[s.status]}</span>
+            </div>
+            <div class="venda-produto">${s.produto} • ${s.quantidade}x ${fmt(s.vendaUnit)}</div>
+            <div class="venda-data">${new Date(s.data+'T12:00:00').toLocaleDateString('pt-BR')}</div>
+          </div>
+          <div class="venda-valores">
+            <div class="venda-total">${fmt(s.vendaTotal)}</div>
+            <div class="venda-lucro">lucro ${fmt(s.lucro)}</div>
+            <div class="venda-margem">margem ${fmtPct(s.margem)}</div>
+          </div>
+        </div>
+        <div class="venda-acoes">
+          <button class="btn-editar" onclick="abrirEditar(${s.id})">✏️ Editar</button>
+          <button class="btn-excluir" onclick="pedirDelete(${s.id})">🗑️ Excluir</button>
+        </div>
+      </div>
+    `).join('');
+  document.getElementById('lista').innerHTML = html;
+}
+
+function renderResumo() {
+  // Status
+  const statusLabel = { 'PAGO': '✓ Pago', 'EM ABERTO': '⏳ Em Aberto', 'ATRASADO': '⚠ Atrasado' };
+  const statusBg = { 'PAGO': '#dcfce7', 'EM ABERTO': '#fef9c3', 'ATRASADO': '#fee2e2' };
+  const statusColor = { 'PAGO': '#15803d', 'EM ABERTO': '#a16207', 'ATRASADO': '#b91c1c' };
+  document.getElementById('resumo-status').innerHTML = ['PAGO','EM ABERTO','ATRASADO'].map(st => {
+    const g = vendas.filter(s=>s.status===st);
+    const total = g.reduce((a,b)=>a+b.vendaTotal,0);
+    return `<div class="status-row" style="background:${statusBg[st]}">
+      <div><span class="status-label" style="color:${statusColor[st]}">${statusLabel[st]}</span><span class="status-count">${g.length} venda(s)</span></div>
+      <span style="font-weight:700;color:${statusColor[st]}">${fmt(total)}</span>
+    </div>`;
+  }).join('');
+
+  // Categorias
+  const cats = {};
+  vendas.forEach(s => {
+    if (!cats[s.categoria]) cats[s.categoria] = {vendas:0,lucro:0,count:0};
+    cats[s.categoria].vendas += s.vendaTotal;
+    cats[s.categoria].lucro += s.lucro;
+    cats[s.categoria].count += 1;
+  });
+  const catList = Object.entries(cats).sort((a,b)=>b[1].vendas-a[1].vendas);
+  const maxV = catList[0][1].vendas;
+  document.getElementById('resumo-cats').innerHTML = catList.map(([cat,d]) => `
+    <div class="cat-row">
+      <div class="cat-header"><span class="cat-nome">${cat}</span><span class="cat-valor">${fmt(d.vendas)}</span></div>
+      <div class="progress-bg"><div class="progress-fill" style="width:${(d.vendas/maxV*100).toFixed(1)}%"></div></div>
+      <div class="cat-sub">${d.count} vendas · lucro ${fmt(d.lucro)} · margem ${fmtPct(d.lucro/d.vendas)}</div>
+    </div>
+  `).join('');
+
+  // Clientes
+  const clts = {};
+  vendas.forEach(s => {
+    if (!clts[s.cliente]) clts[s.cliente] = {vendas:0,count:0};
+    clts[s.cliente].vendas += s.vendaTotal;
+    clts[s.cliente].count += 1;
+  });
+  const cltList = Object.entries(clts).sort((a,b)=>b[1].vendas-a[1].vendas).slice(0,10);
+  document.getElementById('resumo-clientes').innerHTML = cltList.map(([nome,d]) => `
+    <div class="cliente-row">
+      <span class="cliente-nome">${nome}</span>
+      <div><span class="cliente-valor">${fmt(d.vendas)}</span><span class="cliente-count">${d.count}x</span></div>
+    </div>
+  `).join('');
+}
+
+function toggleStatus(id) {
+  const v = vendas.find(x=>x.id===id);
+  if (!v) return;
+  const next = v.status==='PAGO'?'EM ABERTO':v.status==='EM ABERTO'?'ATRASADO':'PAGO';
+  v.status = next;
+  renderCards(); renderLista();
+}
+
+function abrirNova() {
+  editandoId = null;
+  document.getElementById('modal-title').textContent = '➕ Nova Venda';
+  document.getElementById('btn-salvar').textContent = 'Adicionar Venda';
+  document.getElementById('f-data').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-cliente').value = '';
+  document.getElementById('f-produto').value = '';
+  document.getElementById('f-categoria').value = 'Produto Capilar';
+  document.getElementById('f-custo').value = '';
+  document.getElementById('f-venda').value = '';
+  document.getElementById('f-qtd').value = 1;
+  setStatus('PAGO');
+  document.getElementById('preview-box').classList.remove('show');
+  document.getElementById('overlay').classList.add('show');
+}
+
+function abrirEditar(id) {
+  const v = vendas.find(x=>x.id===id);
+  editandoId = id;
+  document.getElementById('modal-title').textContent = '✏️ Editar Venda';
+  document.getElementById('btn-salvar').textContent = 'Salvar Alterações';
+  document.getElementById('f-data').value = v.data;
+  document.getElementById('f-cliente').value = v.cliente;
+  document.getElementById('f-produto').value = v.produto;
+  document.getElementById('f-categoria').value = v.categoria;
+  document.getElementById('f-custo').value = v.custoUnit;
+  document.getElementById('f-venda').value = v.vendaUnit;
+  document.getElementById('f-qtd').value = v.quantidade;
+  setStatus(v.status);
+  atualizarPreview();
+  document.getElementById('overlay').classList.add('show');
+}
+
+function fecharModal() {
+  document.getElementById('overlay').classList.remove('show');
+}
+
+function setStatus(s) {
+  formStatus = s;
+  document.getElementById('sbtn-pago').className = 'status-btn' + (s==='PAGO'?' active-pago':'');
+  document.getElementById('sbtn-em-aberto').className = 'status-btn' + (s==='EM ABERTO'?' active-em-aberto':'');
+  document.getElementById('sbtn-atrasado').className = 'status-btn' + (s==='ATRASADO'?' active-atrasado':'');
+}
+
+function atualizarPreview() {
+  const custo = +document.getElementById('f-custo').value||0;
+  const venda = +document.getElementById('f-venda').value||0;
+  const qtd = +document.getElementById('f-qtd').value||1;
+  const box = document.getElementById('preview-box');
+  if (custo && venda) {
+    box.classList.add('show');
+    document.getElementById('prev-total').textContent = fmt(venda*qtd);
+    document.getElementById('prev-lucro').textContent = fmt((venda-custo)*qtd);
+    document.getElementById('prev-margem').textContent = venda>0?fmtPct((venda-custo)/venda):'0%';
+  } else {
+    box.classList.remove('show');
+  }
+}
+
+function salvar() {
+  const cliente = document.getElementById('f-cliente').value.trim();
+  const produto = document.getElementById('f-produto').value.trim();
+  const custo = +document.getElementById('f-custo').value;
+  const venda = +document.getElementById('f-venda').value;
+  if (!cliente || !produto || !custo || !venda) { alert('Preencha todos os campos!'); return; }
+  const row = calcRow({
+    data: document.getElementById('f-data').value,
+    cliente, categoria: document.getElementById('f-categoria').value,
+    produto, custoUnit: custo, vendaUnit: venda,
+    quantidade: +document.getElementById('f-qtd').value||1, status: formStatus
+  });
+  if (editandoId !== null) {
+    const idx = vendas.findIndex(x=>x.id===editandoId);
+    vendas[idx] = { ...row, id: editandoId };
+  } else {
+    vendas.push({ ...row, id: nextId++ });
+  }
+  fecharModal();
+  renderCards(); renderLista(); renderMesBar();
+}
+
+function pedirDelete(id) {
+  deletandoId = id;
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+
+function fecharConfirm() {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  deletandoId = null;
+}
+
+function confirmarDelete() {
+  vendas = vendas.filter(x=>x.id!==deletandoId);
+  fecharConfirm();
+  renderCards(); renderLista(); renderMesBar();
+}
+
+// Fechar overlay clicando fora
+document.getElementById('overlay').addEventListener('click', function(e) {
+  if (e.target === this) fecharModal();
+});
+
+// Init
+renderMesBar();
+renderCards();
+renderLista();
+</script>
+</body>
+</html>
