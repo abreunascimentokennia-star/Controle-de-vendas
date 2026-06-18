@@ -665,12 +665,154 @@ function confirmarDelete() {
 // Fechar overlay clicando fora
 document.getElementById('overlay').addEventListener('click', function(e) {
   if (e.target === this) fecharModal();
-});
+});</script>
 
-// Init
-renderMesBar();
-renderCards();
-renderLista();
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDXqeD7oGWv9HPfs9iHlwzek7IQvMWuV90",
+  authDomain: "controle-de-vendas-e5123.firebaseapp.com",
+  projectId: "controle-de-vendas-e5123",
+  storageBucket: "controle-de-vendas-e5123.firebasestorage.app",
+  messagingSenderId: "635752239153",
+  appId: "1:635752239153:web:af760919e6fc974f4ac510"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const COL = 'vendas';
+
+function mostrarLoading(msg) {
+  document.getElementById('loading-msg').textContent = msg || 'Carregando...';
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function esconderLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+
+// Carrega todas as vendas do Firestore
+async function carregarVendas() {
+  mostrarLoading('Carregando vendas...');
+  try {
+    const snap = await getDocs(collection(db, COL));
+    if (snap.empty) {
+      // Primeira vez: sobe os dados iniciais da planilha
+      mostrarLoading('Primeira vez! Salvando dados iniciais...');
+      const batch = writeBatch(db);
+      vendas.forEach(v => {
+        const ref = doc(collection(db, COL));
+        const { id, custoTotal, vendaTotal, lucro, margem, ...dados } = v;
+        batch.set(ref, dados);
+      });
+      await batch.commit();
+      // Recarrega após salvar
+      const snap2 = await getDocs(collection(db, COL));
+      vendas = snap2.docs.map(d => calcRow({ ...d.data(), fireId: d.id }));
+    } else {
+      vendas = snap.docs.map(d => calcRow({ ...d.data(), fireId: d.id }));
+    }
+    nextId = vendas.length + 1;
+  } catch(e) {
+    alert('Erro ao carregar: ' + e.message);
+  }
+  esconderLoading();
+  renderMesBar();
+  renderCards();
+  renderLista();
+}
+
+// Salvar nova venda
+async function salvarFirebase(row) {
+  mostrarLoading('Salvando...');
+  try {
+    const { custoTotal, vendaTotal, lucro, margem, id, fireId, ...dados } = row;
+    if (editandoId !== null) {
+      const v = vendas.find(x => x.id === editandoId);
+      await updateDoc(doc(db, COL, v.fireId), dados);
+      vendas = vendas.map(x => x.id === editandoId ? { ...row, id: editandoId, fireId: v.fireId } : x);
+    } else {
+      const ref = await addDoc(collection(db, COL), dados);
+      vendas.push({ ...row, fireId: ref.id });
+    }
+  } catch(e) {
+    alert('Erro ao salvar: ' + e.message);
+  }
+  esconderLoading();
+  renderCards(); renderLista(); renderMesBar();
+}
+
+// Deletar venda
+async function deletarFirebase(id) {
+  mostrarLoading('Excluindo...');
+  try {
+    const v = vendas.find(x => x.id === id);
+    await deleteDoc(doc(db, COL, v.fireId));
+    vendas = vendas.filter(x => x.id !== id);
+  } catch(e) {
+    alert('Erro ao excluir: ' + e.message);
+  }
+  esconderLoading();
+  renderCards(); renderLista(); renderMesBar();
+}
+
+// Toggle status
+async function toggleStatusFirebase(id) {
+  const v = vendas.find(x => x.id === id);
+  if (!v) return;
+  const next = v.status==='PAGO'?'EM ABERTO':v.status==='EM ABERTO'?'ATRASADO':'PAGO';
+  mostrarLoading('Atualizando...');
+  try {
+    await updateDoc(doc(db, COL, v.fireId), { status: next });
+    v.status = next;
+  } catch(e) {
+    alert('Erro: ' + e.message);
+  }
+  esconderLoading();
+  renderCards(); renderLista();
+}
+
+// Sobrescreve as funções globais para usar Firebase
+window.toggleStatus = toggleStatusFirebase;
+
+window.salvar = async function() {
+  const cliente = document.getElementById('f-cliente').value.trim();
+  const produto = document.getElementById('f-produto').value.trim();
+  const custo = +document.getElementById('f-custo').value;
+  const venda = +document.getElementById('f-venda').value;
+  if (!cliente || !produto || !custo || !venda) { alert('Preencha todos os campos!'); return; }
+  const row = calcRow({
+    data: document.getElementById('f-data').value,
+    cliente, categoria: document.getElementById('f-categoria').value,
+    produto, custoUnit: custo, vendaUnit: venda,
+    quantidade: +document.getElementById('f-qtd').value||1, status: formStatus,
+    id: editandoId !== null ? editandoId : nextId++
+  });
+  fecharModal();
+  await salvarFirebase(row);
+};
+
+window.confirmarDelete = async function() {
+  const id = deletandoId;
+  fecharConfirm();
+  await deletarFirebase(id);
+};
+
+// Inicia carregando do Firebase
+carregarVendas();
 </script>
+
+<!-- Loading overlay -->
+<div id="loading-overlay" style="display:none;position:fixed;inset:0;background:rgba(124,58,237,0.18);z-index:999;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:16px;padding:24px 32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.12);">
+    <div style="font-size:28px;margin-bottom:8px;">💜</div>
+    <div id="loading-msg" style="font-size:15px;font-weight:600;color:#7c3aed;">Carregando...</div>
+  </div>
+</div>
+<style>
+  #loading-overlay.show { display:flex !important; }
+</style>
+
 </body>
 </html>
