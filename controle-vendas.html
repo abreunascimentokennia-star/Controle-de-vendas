@@ -669,7 +669,7 @@ document.getElementById('overlay').addEventListener('click', function(e) {
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDXqeD7oGWv9HPfs9iHlwzek7IQvMWuV90",
@@ -698,16 +698,12 @@ async function carregarVendas() {
   try {
     const snap = await getDocs(collection(db, COL));
     if (snap.empty) {
-      // Primeira vez: sobe os dados iniciais da planilha
-      mostrarLoading('Primeira vez! Salvando dados iniciais...');
-      const batch = writeBatch(db);
-      vendas.forEach(v => {
-        const ref = doc(collection(db, COL));
+      // Banco vazio: sobe dados iniciais UMA única vez
+      mostrarLoading('Configurando pela primeira vez...');
+      for (const v of vendas) {
         const { id, custoTotal, vendaTotal, lucro, margem, ...dados } = v;
-        batch.set(ref, dados);
-      });
-      await batch.commit();
-      // Recarrega após salvar
+        await addDoc(collection(db, COL), dados);
+      }
       const snap2 = await getDocs(collection(db, COL));
       vendas = snap2.docs.map(d => calcRow({ ...d.data(), fireId: d.id }));
     } else {
