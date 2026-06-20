@@ -144,9 +144,36 @@ const fmt = (v) => `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigi
 const fmtPct = (v) => `${(v * 100).toFixed(1)}%`;
 const emptyForm = () => ({ data: new Date().toISOString().split("T")[0], cliente: "", categoria: "Produto Capilar", produto: "", custoUnit: "", vendaUnit: "", quantidade: 1, status: "PAGO" });
 
+/* ===================== PERSISTÊNCIA (localStorage) ===================== */
+const STORAGE_KEY = "controle-vendas-dados";
+
+function loadSales() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return initialSales;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return initialSales;
+    return parsed;
+  } catch (e) {
+    console.error("Erro ao carregar dados salvos:", e);
+    return initialSales;
+  }
+}
+
+function saveSales() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sales));
+  } catch (e) {
+    console.error("Erro ao salvar dados:", e);
+  }
+}
+
 /* ===================== ESTADO ===================== */
+const loadedSales = loadSales();
+nextId = loadedSales.reduce((max, s) => Math.max(max, s.id), 0) + 1;
+
 const state = {
-  sales: initialSales,
+  sales: loadedSales,
   view: "vendas",
   form: emptyForm(),
   editId: null,
@@ -212,6 +239,7 @@ function handleSave() {
   state.form = emptyForm();
   state.editId = null;
   state.showForm = false;
+  saveSales();
   render();
 }
 
@@ -225,6 +253,7 @@ function handleEdit(sale) {
 function handleDelete(id) {
   state.sales = state.sales.filter((x) => x.id !== id);
   state.confirmDel = null;
+  saveSales();
   render();
 }
 
@@ -234,6 +263,7 @@ function handleStatusToggle(id) {
     const next = x.status === "PAGO" ? "EM ABERTO" : x.status === "EM ABERTO" ? "ATRASADO" : "PAGO";
     return { ...x, status: next };
   });
+  saveSales();
   render();
 }
 
