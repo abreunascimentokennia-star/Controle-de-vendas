@@ -400,6 +400,7 @@ let filtroMes = 'TODOS';
 let editandoId = null;
 let deletandoId = null;
 let formStatus = 'PAGO';
+window._getFormStatus = () => formStatus;
 
 const MESES_NOME = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -754,7 +755,7 @@ window.salvar = async function() {
     data: document.getElementById('f-data').value,
     cliente, categoria: document.getElementById('f-categoria').value,
     produto, custoUnit: custo, vendaUnit: venda,
-    quantidade: +document.getElementById('f-qtd').value||1, status: formStatus,
+    quantidade: +document.getElementById('f-qtd').value||1, status: window._getFormStatus(),
     id: editandoId !== null ? editandoId : nextId++
   });
   fecharModal();
