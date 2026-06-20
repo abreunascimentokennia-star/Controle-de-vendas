@@ -1,5 +1,22 @@
-import { useState, useMemo } from "react";
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Controle de Vendas</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #f8f5ff; color: #1e1e2e; }
+  button { cursor: pointer; font-family: inherit; }
+  input, select { font-family: inherit; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+</style>
+</head>
+<body>
+<div id="app"></div>
 
+<script>
+/* ===================== DADOS E CONSTANTES ===================== */
 const CATEGORIAS = ["Produto Capilar", "Produto de pele", "produto intimo", "calçados", "Acessório", "Outro"];
 const STATUS_OPTS = ["PAGO", "EM ABERTO", "ATRASADO"];
 const STATUS_STYLE = {
@@ -125,307 +142,483 @@ const initialSales = RAW.map((r, i) => calcRow({
 
 const fmt = (v) => `R$ ${Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtPct = (v) => `${(v * 100).toFixed(1)}%`;
-const emptyForm = { data: new Date().toISOString().split("T")[0], cliente: "", categoria: "Produto Capilar", produto: "", custoUnit: "", vendaUnit: "", quantidade: 1, status: "PAGO" };
+const emptyForm = () => ({ data: new Date().toISOString().split("T")[0], cliente: "", categoria: "Produto Capilar", produto: "", custoUnit: "", vendaUnit: "", quantidade: 1, status: "PAGO" });
 
-export default function App() {
-  const [sales, setSales] = useState(initialSales);
-  const [view, setView] = useState("vendas");
-  const [form, setForm] = useState(emptyForm);
-  const [editId, setEditId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("TODOS");
-  const [filterCat, setFilterCat] = useState("TODAS");
-  const [search, setSearch] = useState("");
-  const [confirmDel, setConfirmDel] = useState(null);
+/* ===================== ESTADO ===================== */
+const state = {
+  sales: initialSales,
+  view: "vendas",
+  form: emptyForm(),
+  editId: null,
+  showForm: false,
+  filterStatus: "TODOS",
+  filterCat: "TODAS",
+  search: "",
+  confirmDel: null,
+};
 
-  const filtered = useMemo(() => sales.filter((s) => {
-    if (filterStatus !== "TODOS" && s.status !== filterStatus) return false;
-    if (filterCat !== "TODAS" && s.categoria !== filterCat) return false;
-    if (search && !s.cliente.toLowerCase().includes(search.toLowerCase()) && !s.produto.toLowerCase().includes(search.toLowerCase())) return false;
+/* ===================== HELPERS DE ESCAPE ===================== */
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/* ===================== DERIVADOS ===================== */
+function getFiltered() {
+  return state.sales.filter((s) => {
+    if (state.filterStatus !== "TODOS" && s.status !== state.filterStatus) return false;
+    if (state.filterCat !== "TODAS" && s.categoria !== state.filterCat) return false;
+    if (state.search && !s.cliente.toLowerCase().includes(state.search.toLowerCase()) && !s.produto.toLowerCase().includes(state.search.toLowerCase())) return false;
     return true;
-  }), [sales, filterStatus, filterCat, search]);
+  });
+}
 
-  const totals = useMemo(() => ({
-    vendaTotal: sales.reduce((a, b) => a + b.vendaTotal, 0),
-    lucroTotal: sales.reduce((a, b) => a + b.lucro, 0),
-    emAberto: sales.filter((s) => s.status === "EM ABERTO" || s.status === "ATRASADO").reduce((a, b) => a + b.vendaTotal, 0),
-  }), [sales]);
-
-  const byCategoria = useMemo(() => {
-    const map = {};
-    sales.forEach((s) => {
-      if (!map[s.categoria]) map[s.categoria] = { vendas: 0, lucro: 0, count: 0 };
-      map[s.categoria].vendas += s.vendaTotal;
-      map[s.categoria].lucro += s.lucro;
-      map[s.categoria].count += 1;
-    });
-    return Object.entries(map).sort((a, b) => b[1].vendas - a[1].vendas);
-  }, [sales]);
-
-  const handleSave = () => {
-    if (!form.cliente || !form.produto || !form.vendaUnit || !form.custoUnit) return;
-    const row = calcRow({ ...form, custoUnit: +form.custoUnit, vendaUnit: +form.vendaUnit, quantidade: +form.quantidade });
-    if (editId !== null) {
-      setSales((s) => s.map((x) => (x.id === editId ? { ...row, id: editId } : x)));
-    } else {
-      setSales((s) => [...s, { ...row, id: nextId++ }]);
-    }
-    setForm(emptyForm); setEditId(null); setShowForm(false);
+function getTotals() {
+  return {
+    vendaTotal: state.sales.reduce((a, b) => a + b.vendaTotal, 0),
+    lucroTotal: state.sales.reduce((a, b) => a + b.lucro, 0),
+    emAberto: state.sales.filter((s) => s.status === "EM ABERTO" || s.status === "ATRASADO").reduce((a, b) => a + b.vendaTotal, 0),
   };
+}
 
-  const handleEdit = (sale) => {
-    setForm({ data: sale.data, cliente: sale.cliente, categoria: sale.categoria, produto: sale.produto, custoUnit: sale.custoUnit, vendaUnit: sale.vendaUnit, quantidade: sale.quantidade, status: sale.status });
-    setEditId(sale.id); setShowForm(true);
-  };
+function getByCategoria() {
+  const map = {};
+  state.sales.forEach((s) => {
+    if (!map[s.categoria]) map[s.categoria] = { vendas: 0, lucro: 0, count: 0 };
+    map[s.categoria].vendas += s.vendaTotal;
+    map[s.categoria].lucro += s.lucro;
+    map[s.categoria].count += 1;
+  });
+  return Object.entries(map).sort((a, b) => b[1].vendas - a[1].vendas);
+}
 
-  const handleDelete = (id) => { setSales((s) => s.filter((x) => x.id !== id)); setConfirmDel(null); };
+function getTopClientes() {
+  const acc = {};
+  state.sales.forEach((s) => {
+    if (!acc[s.cliente]) acc[s.cliente] = { vendas: 0, count: 0 };
+    acc[s.cliente].vendas += s.vendaTotal;
+    acc[s.cliente].count += 1;
+  });
+  return Object.entries(acc).sort((a, b) => b[1].vendas - a[1].vendas).slice(0, 10);
+}
 
-  const handleStatusToggle = (id) => {
-    setSales((s) => s.map((x) => {
-      if (x.id !== id) return x;
-      const next = x.status === "PAGO" ? "EM ABERTO" : x.status === "EM ABERTO" ? "ATRASADO" : "PAGO";
-      return { ...x, status: next };
-    }));
-  };
+/* ===================== AÇÕES ===================== */
+function handleSave() {
+  const f = state.form;
+  if (!f.cliente || !f.produto || !f.vendaUnit || !f.custoUnit) return;
+  const row = calcRow({ ...f, custoUnit: +f.custoUnit, vendaUnit: +f.vendaUnit, quantidade: +f.quantidade });
+  if (state.editId !== null) {
+    state.sales = state.sales.map((x) => (x.id === state.editId ? { ...row, id: state.editId } : x));
+  } else {
+    state.sales = [...state.sales, { ...row, id: nextId++ }];
+  }
+  state.form = emptyForm();
+  state.editId = null;
+  state.showForm = false;
+  render();
+}
 
-  return (
-    <div style={{ fontFamily: "'Segoe UI', sans-serif", background: "#f8f5ff", minHeight: "100vh", color: "#1e1e2e" }}>
-      <div style={{ background: "linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)", padding: "20px 20px 0", color: "white" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+function handleEdit(sale) {
+  state.form = { data: sale.data, cliente: sale.cliente, categoria: sale.categoria, produto: sale.produto, custoUnit: sale.custoUnit, vendaUnit: sale.vendaUnit, quantidade: sale.quantidade, status: sale.status };
+  state.editId = sale.id;
+  state.showForm = true;
+  render();
+}
+
+function handleDelete(id) {
+  state.sales = state.sales.filter((x) => x.id !== id);
+  state.confirmDel = null;
+  render();
+}
+
+function handleStatusToggle(id) {
+  state.sales = state.sales.map((x) => {
+    if (x.id !== id) return x;
+    const next = x.status === "PAGO" ? "EM ABERTO" : x.status === "EM ABERTO" ? "ATRASADO" : "PAGO";
+    return { ...x, status: next };
+  });
+  render();
+}
+
+/* ===================== RENDER ===================== */
+function render() {
+  const app = document.getElementById("app");
+  const totals = getTotals();
+
+  app.innerHTML = `
+    <div style="font-family:'Segoe UI', sans-serif; background:#f8f5ff; min-height:100vh; color:#1e1e2e;">
+      <div style="background:linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding:20px 20px 0; color:white;">
+        <div class="wrap">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>💜 Controle de Vendas</div>
-              <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>Minhas vendas e lucros</div>
+              <div style="font-size:22px; font-weight:700; letter-spacing:-0.5px;">💜 Controle de Vendas</div>
+              <div style="font-size:12px; opacity:0.85; margin-top:2px;">Minhas vendas e lucros</div>
             </div>
-            <button onClick={() => { setForm(emptyForm); setEditId(null); setShowForm(true); }}
-              style={{ background: "white", color: "#7c3aed", border: "none", borderRadius: 20, padding: "8px 18px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
+            <button id="btn-nova-venda" style="background:white; color:#7c3aed; border:none; border-radius:20px; padding:8px 18px; font-weight:700; font-size:14px;">
               + Nova Venda
             </button>
           </div>
-          <div style={{ display: "flex", gap: 4 }}>
-            {["vendas","resumo"].map((v) => (
-              <button key={v} onClick={() => setView(v)}
-                style={{ background: view === v ? "white" : "transparent", color: view === v ? "#7c3aed" : "white", border: "none", borderRadius: "8px 8px 0 0", padding: "8px 20px", fontWeight: 600, fontSize: 14, cursor: "pointer", opacity: view === v ? 1 : 0.8 }}>
-                {v === "vendas" ? "📋 Vendas" : "📊 Resumo"}
+          <div style="display:flex; gap:4px;">
+            ${["vendas", "resumo"].map((v) => `
+              <button class="tab-btn" data-view="${v}" style="background:${state.view === v ? "white" : "transparent"}; color:${state.view === v ? "#7c3aed" : "white"}; border:none; border-radius:8px 8px 0 0; padding:8px 20px; font-weight:600; font-size:14px; opacity:${state.view === v ? 1 : 0.8};">
+                ${v === "vendas" ? "📋 Vendas" : "📊 Resumo"}
               </button>
-            ))}
+            `).join("")}
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "16px 12px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
-          {[
+      <div class="wrap" style="padding:16px 12px;">
+        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:16px;">
+          ${[
             { label: "Total Vendido", value: fmt(totals.vendaTotal), icon: "💰", color: "#7c3aed" },
             { label: "Lucro Total", value: fmt(totals.lucroTotal), icon: "📈", color: "#15803d" },
             { label: "A Receber", value: fmt(totals.emAberto), icon: "⏳", color: "#a16207" },
-          ].map((c) => (
-            <div key={c.label} style={{ background: "white", borderRadius: 12, padding: "14px 12px", boxShadow: "0 1px 4px rgba(0,0,0,0.07)", borderTop: `3px solid ${c.color}` }}>
-              <div style={{ fontSize: 18, marginBottom: 4 }}>{c.icon}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: c.color }}>{c.value}</div>
-              <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{c.label}</div>
+          ].map((c) => `
+            <div style="background:white; border-radius:12px; padding:14px 12px; box-shadow:0 1px 4px rgba(0,0,0,0.07); border-top:3px solid ${c.color};">
+              <div style="font-size:18px; margin-bottom:4px;">${c.icon}</div>
+              <div style="font-size:16px; font-weight:700; color:${c.color};">${c.value}</div>
+              <div style="font-size:11px; color:#888; margin-top:2px;">${c.label}</div>
             </div>
-          ))}
+          `).join("")}
         </div>
 
-        {view === "vendas" && (
-          <>
-            <div style={{ background: "white", borderRadius: 12, padding: 12, marginBottom: 12, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-              <input placeholder="🔍 Buscar cliente ou produto..." value={search} onChange={(e) => setSearch(e.target.value)}
-                style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", fontSize: 14, marginBottom: 10, boxSizing: "border-box", outline: "none" }} />
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {["TODOS","PAGO","EM ABERTO","ATRASADO"].map((s) => (
-                  <button key={s} onClick={() => setFilterStatus(s)}
-                    style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, border: "1.5px solid", cursor: "pointer", fontWeight: filterStatus === s ? 700 : 400,
-                      borderColor: filterStatus === s ? "#7c3aed" : "#e5e7eb", background: filterStatus === s ? "#f3e8ff" : "white", color: filterStatus === s ? "#7c3aed" : "#666" }}>
-                    {s === "TODOS" ? "Todos" : STATUS_STYLE[s]?.label || s}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 8, paddingLeft: 4 }}>
-              {filtered.length} venda(s) encontrada(s)
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {filtered.length === 0 && <div style={{ textAlign: "center", color: "#aaa", padding: 32 }}>Nenhuma venda encontrada</div>}
-              {filtered.slice().reverse().map((s) => (
-                <div key={s.id} style={{ background: "white", borderRadius: 12, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", borderLeft: `4px solid ${s.status === "PAGO" ? "#22c55e" : s.status === "ATRASADO" ? "#ef4444" : "#eab308"}` }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: 15 }}>{s.cliente}</span>
-                        <span style={{ fontSize: 11, background: "#f3e8ff", color: "#7c3aed", padding: "2px 8px", borderRadius: 20 }}>{s.categoria}</span>
-                        <span onClick={() => handleStatusToggle(s.id)} title="Clique para mudar status"
-                          style={{ fontSize: 11, background: STATUS_STYLE[s.status]?.bg, color: STATUS_STYLE[s.status]?.color, padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontWeight: 600 }}>
-                          {STATUS_STYLE[s.status]?.label}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 13, color: "#555", marginTop: 4 }}>{s.produto} • {s.quantidade}x {fmt(s.vendaUnit)}</div>
-                      <div style={{ fontSize: 12, color: "#aaa", marginTop: 2 }}>{new Date(s.data + "T12:00:00").toLocaleDateString("pt-BR")}</div>
-                    </div>
-                    <div style={{ textAlign: "right", minWidth: 90 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#7c3aed" }}>{fmt(s.vendaTotal)}</div>
-                      <div style={{ fontSize: 12, color: "#15803d", marginTop: 2 }}>lucro {fmt(s.lucro)}</div>
-                      <div style={{ fontSize: 11, color: "#888" }}>margem {fmtPct(s.margem)}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
-                    <button onClick={() => handleEdit(s)} style={{ fontSize: 12, padding: "4px 12px", borderRadius: 8, border: "1.5px solid #7c3aed", color: "#7c3aed", background: "white", cursor: "pointer" }}>✏️ Editar</button>
-                    <button onClick={() => setConfirmDel(s.id)} style={{ fontSize: 12, padding: "4px 12px", borderRadius: 8, border: "1.5px solid #ef4444", color: "#ef4444", background: "white", cursor: "pointer" }}>🗑️ Excluir</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {view === "resumo" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ background: "white", borderRadius: 12, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>💰 Situação das Cobranças</div>
-              {["PAGO","EM ABERTO","ATRASADO"].map((st) => {
-                const group = sales.filter((s) => s.status === st);
-                const total = group.reduce((a, b) => a + b.vendaTotal, 0);
-                return (
-                  <div key={st} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, marginBottom: 6, background: STATUS_STYLE[st].bg }}>
-                    <div>
-                      <span style={{ fontWeight: 600, color: STATUS_STYLE[st].color }}>{STATUS_STYLE[st].label}</span>
-                      <span style={{ fontSize: 12, color: "#888", marginLeft: 8 }}>{group.length} venda(s)</span>
-                    </div>
-                    <span style={{ fontWeight: 700, color: STATUS_STYLE[st].color }}>{fmt(total)}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ background: "white", borderRadius: 12, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>📦 Vendas por Categoria</div>
-              {byCategoria.map(([cat, data]) => {
-                const pct = (data.vendas / byCategoria[0][1].vendas) * 100;
-                return (
-                  <div key={cat} style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600 }}>{cat}</span>
-                      <span style={{ fontSize: 13, color: "#7c3aed", fontWeight: 700 }}>{fmt(data.vendas)}</span>
-                    </div>
-                    <div style={{ background: "#f3e8ff", borderRadius: 4, height: 6, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, background: "#7c3aed", height: "100%", borderRadius: 4 }} />
-                    </div>
-                    <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{data.count} vendas · lucro {fmt(data.lucro)} · margem {fmtPct(data.lucro / data.vendas)}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ background: "white", borderRadius: 12, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>⭐ Top Clientes</div>
-              {Object.entries(sales.reduce((acc, s) => {
-                if (!acc[s.cliente]) acc[s.cliente] = { vendas: 0, count: 0 };
-                acc[s.cliente].vendas += s.vendaTotal;
-                acc[s.cliente].count += 1;
-                return acc;
-              }, {})).sort((a, b) => b[1].vendas - a[1].vendas).slice(0, 10).map(([cliente, d]) => (
-                <div key={cliente} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "1px solid #f3f4f6" }}>
-                  <span style={{ fontSize: 14 }}>{cliente}</span>
-                  <div style={{ textAlign: "right" }}>
-                    <span style={{ fontWeight: 700, color: "#7c3aed", fontSize: 14 }}>{fmt(d.vendas)}</span>
-                    <span style={{ fontSize: 11, color: "#aaa", marginLeft: 6 }}>{d.count}x</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        ${state.view === "vendas" ? renderVendas() : renderResumo()}
       </div>
 
-      {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "flex-end" }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setForm(emptyForm); setEditId(null); } }}>
-          <div style={{ background: "white", width: "100%", borderRadius: "20px 20px 0 0", padding: "24px 20px 32px", maxHeight: "92vh", overflowY: "auto" }}>
-            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 20, color: "#7c3aed" }}>
-              {editId ? "✏️ Editar Venda" : "➕ Nova Venda"}
-            </div>
-            {[
-              { label: "Data", key: "data", type: "date" },
-              { label: "Cliente", key: "cliente", type: "text", placeholder: "Nome da cliente" },
-              { label: "Produto", key: "produto", type: "text", placeholder: "Ex: Kit Capilar" },
-            ].map(({ label, key, type, placeholder }) => (
-              <div key={key} style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "#555", display: "block", marginBottom: 4 }}>{label}</label>
-                <input type={type} placeholder={placeholder} value={form[key]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "10px 12px", fontSize: 14, boxSizing: "border-box", outline: "none" }} />
-              </div>
-            ))}
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#555", display: "block", marginBottom: 4 }}>Categoria</label>
-              <select value={form.categoria} onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value }))}
-                style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "10px 12px", fontSize: 14, background: "white" }}>
-                {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-              {[
-                { label: "Custo Unit.", key: "custoUnit", placeholder: "0,00" },
-                { label: "Venda Unit.", key: "vendaUnit", placeholder: "0,00" },
-                { label: "Qtd.", key: "quantidade", placeholder: "1" },
-              ].map(({ label, key, placeholder }) => (
-                <div key={key}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: "#555", display: "block", marginBottom: 4 }}>{label}</label>
-                  <input type="number" min="0" step="0.01" placeholder={placeholder} value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    style={{ width: "100%", border: "1.5px solid #e5e7eb", borderRadius: 8, padding: "10px 8px", fontSize: 14, boxSizing: "border-box" }} />
-                </div>
-              ))}
-            </div>
-            {form.custoUnit && form.vendaUnit && (
-              <div style={{ background: "#f3e8ff", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13 }}>
-                <span style={{ marginRight: 16 }}>Venda total: <strong>{fmt((+form.vendaUnit||0)*(+form.quantidade||1))}</strong></span>
-                <span style={{ marginRight: 16 }}>Lucro: <strong style={{ color: "#15803d" }}>{fmt(((+form.vendaUnit||0)-(+form.custoUnit||0))*(+form.quantidade||1))}</strong></span>
-                <span>Margem: <strong>{fmtPct(+form.vendaUnit>0?((+form.vendaUnit-+form.custoUnit)/+form.vendaUnit):0)}</strong></span>
-              </div>
-            )}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#555", display: "block", marginBottom: 4 }}>Status</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {STATUS_OPTS.map((s) => (
-                  <button key={s} onClick={() => setForm((f) => ({ ...f, status: s }))}
-                    style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: `2px solid ${form.status === s ? STATUS_STYLE[s].color : "#e5e7eb"}`,
-                      background: form.status === s ? STATUS_STYLE[s].bg : "white", color: form.status === s ? STATUS_STYLE[s].color : "#888",
-                      fontWeight: form.status === s ? 700 : 400, fontSize: 12, cursor: "pointer" }}>
-                    {STATUS_STYLE[s].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { setShowForm(false); setForm(emptyForm); setEditId(null); }}
-                style={{ flex: 1, padding: 12, borderRadius: 10, border: "1.5px solid #e5e7eb", background: "white", color: "#888", fontWeight: 600, cursor: "pointer" }}>
-                Cancelar
-              </button>
-              <button onClick={handleSave}
-                style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: "linear-gradient(135deg, #7c3aed, #a855f7)", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
-                {editId ? "Salvar Alterações" : "Adicionar Venda"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {confirmDel !== null && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: "white", borderRadius: 16, padding: 24, maxWidth: 320, width: "100%" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Excluir venda?</div>
-            <div style={{ fontSize: 14, color: "#666", marginBottom: 20 }}>Esta ação não pode ser desfeita.</div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setConfirmDel(null)} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1.5px solid #e5e7eb", background: "white", cursor: "pointer" }}>Cancelar</button>
-              <button onClick={() => handleDelete(confirmDel)} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#ef4444", color: "white", fontWeight: 700, cursor: "pointer" }}>Excluir</button>
-            </div>
-          </div>
-        </div>
-      )}
+      ${state.showForm ? renderFormModal() : ""}
+      ${state.confirmDel !== null ? renderConfirmModal() : ""}
     </div>
-  );
+  `;
+
+  attachEvents();
 }
+
+function renderVendas() {
+  const filtered = getFiltered();
+  const statusFilters = ["TODOS", "PAGO", "EM ABERTO", "ATRASADO"];
+
+  return `
+    <div style="background:white; border-radius:12px; padding:12px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <input id="search-input" placeholder="🔍 Buscar cliente ou produto..." value="${esc(state.search)}"
+        style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:8px 12px; font-size:14px; margin-bottom:10px; outline:none;" />
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        ${statusFilters.map((s) => `
+          <button class="filter-status-btn" data-status="${s}" style="font-size:12px; padding:4px 12px; border-radius:20px; border:1.5px solid ${state.filterStatus === s ? "#7c3aed" : "#e5e7eb"}; font-weight:${state.filterStatus === s ? 700 : 400}; background:${state.filterStatus === s ? "#f3e8ff" : "white"}; color:${state.filterStatus === s ? "#7c3aed" : "#666"};">
+            ${s === "TODOS" ? "Todos" : (STATUS_STYLE[s] ? STATUS_STYLE[s].label : s)}
+          </button>
+        `).join("")}
+      </div>
+    </div>
+
+    <div style="font-size:12px; color:#888; margin-bottom:8px; padding-left:4px;">
+      ${filtered.length} venda(s) encontrada(s)
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${filtered.length === 0 ? `<div style="text-align:center; color:#aaa; padding:32px;">Nenhuma venda encontrada</div>` : ""}
+      ${filtered.slice().reverse().map((s) => `
+        <div style="background:white; border-radius:12px; padding:12px 14px; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-left:4px solid ${s.status === "PAGO" ? "#22c55e" : s.status === "ATRASADO" ? "#ef4444" : "#eab308"};">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="flex:1;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <span style="font-weight:700; font-size:15px;">${esc(s.cliente)}</span>
+                <span style="font-size:11px; background:#f3e8ff; color:#7c3aed; padding:2px 8px; border-radius:20px;">${esc(s.categoria)}</span>
+                <span class="status-toggle" data-id="${s.id}" title="Clique para mudar status"
+                  style="font-size:11px; background:${STATUS_STYLE[s.status].bg}; color:${STATUS_STYLE[s.status].color}; padding:2px 8px; border-radius:20px; cursor:pointer; font-weight:600;">
+                  ${STATUS_STYLE[s.status].label}
+                </span>
+              </div>
+              <div style="font-size:13px; color:#555; margin-top:4px;">${esc(s.produto)} • ${s.quantidade}x ${fmt(s.vendaUnit)}</div>
+              <div style="font-size:12px; color:#aaa; margin-top:2px;">${new Date(s.data + "T12:00:00").toLocaleDateString("pt-BR")}</div>
+            </div>
+            <div style="text-align:right; min-width:90px;">
+              <div style="font-weight:700; font-size:15px; color:#7c3aed;">${fmt(s.vendaTotal)}</div>
+              <div style="font-size:12px; color:#15803d; margin-top:2px;">lucro ${fmt(s.lucro)}</div>
+              <div style="font-size:11px; color:#888;">margem ${fmtPct(s.margem)}</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+            <button class="btn-edit" data-id="${s.id}" style="font-size:12px; padding:4px 12px; border-radius:8px; border:1.5px solid #7c3aed; color:#7c3aed; background:white;">✏️ Editar</button>
+            <button class="btn-delete" data-id="${s.id}" style="font-size:12px; padding:4px 12px; border-radius:8px; border:1.5px solid #ef4444; color:#ef4444; background:white;">🗑️ Excluir</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderResumo() {
+  const byCategoria = getByCategoria();
+  const topClientes = getTopClientes();
+  const maxCatVendas = byCategoria.length ? byCategoria[0][1].vendas : 1;
+
+  return `
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <div style="background:white; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div style="font-weight:700; font-size:15px; margin-bottom:12px;">💰 Situação das Cobranças</div>
+        ${["PAGO", "EM ABERTO", "ATRASADO"].map((st) => {
+          const group = state.sales.filter((s) => s.status === st);
+          const total = group.reduce((a, b) => a + b.vendaTotal, 0);
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-radius:8px; margin-bottom:6px; background:${STATUS_STYLE[st].bg};">
+              <div>
+                <span style="font-weight:600; color:${STATUS_STYLE[st].color};">${STATUS_STYLE[st].label}</span>
+                <span style="font-size:12px; color:#888; margin-left:8px;">${group.length} venda(s)</span>
+              </div>
+              <span style="font-weight:700; color:${STATUS_STYLE[st].color};">${fmt(total)}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      <div style="background:white; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div style="font-weight:700; font-size:15px; margin-bottom:12px;">📦 Vendas por Categoria</div>
+        ${byCategoria.map(([cat, data]) => {
+          const pct = (data.vendas / maxCatVendas) * 100;
+          return `
+            <div style="margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="font-size:13px; font-weight:600;">${esc(cat)}</span>
+                <span style="font-size:13px; color:#7c3aed; font-weight:700;">${fmt(data.vendas)}</span>
+              </div>
+              <div style="background:#f3e8ff; border-radius:4px; height:6px; overflow:hidden;">
+                <div style="width:${pct}%; background:#7c3aed; height:100%; border-radius:4px;"></div>
+              </div>
+              <div style="font-size:11px; color:#888; margin-top:2px;">${data.count} vendas · lucro ${fmt(data.lucro)} · margem ${fmtPct(data.lucro / data.vendas)}</div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      <div style="background:white; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div style="font-weight:700; font-size:15px; margin-bottom:12px;">⭐ Top Clientes</div>
+        ${topClientes.map(([cliente, d]) => `
+          <div style="display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #f3f4f6;">
+            <span style="font-size:14px;">${esc(cliente)}</span>
+            <div style="text-align:right;">
+              <span style="font-weight:700; color:#7c3aed; font-size:14px;">${fmt(d.vendas)}</span>
+              <span style="font-size:11px; color:#aaa; margin-left:6px;">${d.count}x</span>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderFormModal() {
+  const f = state.form;
+  const showResumoVenda = f.custoUnit && f.vendaUnit;
+  const vendaTotalPrev = (+f.vendaUnit || 0) * (+f.quantidade || 1);
+  const lucroPrev = ((+f.vendaUnit || 0) - (+f.custoUnit || 0)) * (+f.quantidade || 1);
+  const margemPrev = +f.vendaUnit > 0 ? ((+f.vendaUnit - +f.custoUnit) / +f.vendaUnit) : 0;
+
+  return `
+    <div id="modal-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; display:flex; align-items:flex-end;">
+      <div style="background:white; width:100%; border-radius:20px 20px 0 0; padding:24px 20px 32px; max-height:92vh; overflow-y:auto;">
+        <div style="font-weight:700; font-size:17px; margin-bottom:20px; color:#7c3aed;">
+          ${state.editId ? "✏️ Editar Venda" : "➕ Nova Venda"}
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Data</label>
+          <input type="date" class="form-field" data-key="data" value="${esc(f.data)}"
+            style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:14px; outline:none;" />
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Cliente</label>
+          <input type="text" class="form-field" data-key="cliente" placeholder="Nome da cliente" value="${esc(f.cliente)}"
+            style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:14px; outline:none;" />
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Produto</label>
+          <input type="text" class="form-field" data-key="produto" placeholder="Ex: Kit Capilar" value="${esc(f.produto)}"
+            style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:14px; outline:none;" />
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Categoria</label>
+          <select id="form-categoria" style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 12px; font-size:14px; background:white;">
+            ${CATEGORIAS.map((c) => `<option ${f.categoria === c ? "selected" : ""}>${esc(c)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+          <div>
+            <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Custo Unit.</label>
+            <input type="number" min="0" step="0.01" class="form-field" data-key="custoUnit" placeholder="0,00" value="${esc(f.custoUnit)}"
+              style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 8px; font-size:14px;" />
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Venda Unit.</label>
+            <input type="number" min="0" step="0.01" class="form-field" data-key="vendaUnit" placeholder="0,00" value="${esc(f.vendaUnit)}"
+              style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 8px; font-size:14px;" />
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Qtd.</label>
+            <input type="number" min="0" step="0.01" class="form-field" data-key="quantidade" placeholder="1" value="${esc(f.quantidade)}"
+              style="width:100%; border:1.5px solid #e5e7eb; border-radius:8px; padding:10px 8px; font-size:14px;" />
+          </div>
+        </div>
+
+        ${showResumoVenda ? `
+          <div style="background:#f3e8ff; border-radius:10px; padding:10px 14px; margin-bottom:14px; font-size:13px;">
+            <span style="margin-right:16px;">Venda total: <strong>${fmt(vendaTotalPrev)}</strong></span>
+            <span style="margin-right:16px;">Lucro: <strong style="color:#15803d;">${fmt(lucroPrev)}</strong></span>
+            <span>Margem: <strong>${fmtPct(margemPrev)}</strong></span>
+          </div>
+        ` : ""}
+
+        <div style="margin-bottom:20px;">
+          <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:4px;">Status</label>
+          <div style="display:flex; gap:8px;">
+            ${STATUS_OPTS.map((s) => `
+              <button class="status-pick-btn" data-status="${s}" style="flex:1; padding:8px 4px; border-radius:8px; border:2px solid ${f.status === s ? STATUS_STYLE[s].color : "#e5e7eb"}; background:${f.status === s ? STATUS_STYLE[s].bg : "white"}; color:${f.status === s ? STATUS_STYLE[s].color : "#888"}; font-weight:${f.status === s ? 700 : 400}; font-size:12px;">
+                ${STATUS_STYLE[s].label}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+          <button id="btn-cancelar" style="flex:1; padding:12px; border-radius:10px; border:1.5px solid #e5e7eb; background:white; color:#888; font-weight:600;">
+            Cancelar
+          </button>
+          <button id="btn-salvar" style="flex:2; padding:12px; border-radius:10px; border:none; background:linear-gradient(135deg, #7c3aed, #a855f7); color:white; font-weight:700; font-size:15px;">
+            ${state.editId ? "Salvar Alterações" : "Adicionar Venda"}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderConfirmModal() {
+  return `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div style="background:white; border-radius:16px; padding:24px; max-width:320px; width:100%;">
+        <div style="font-size:16px; font-weight:700; margin-bottom:8px;">Excluir venda?</div>
+        <div style="font-size:14px; color:#666; margin-bottom:20px;">Esta ação não pode ser desfeita.</div>
+        <div style="display:flex; gap:10px;">
+          <button id="btn-confirm-cancel" style="flex:1; padding:10px; border-radius:8px; border:1.5px solid #e5e7eb; background:white;">Cancelar</button>
+          <button id="btn-confirm-delete" style="flex:1; padding:10px; border-radius:8px; border:none; background:#ef4444; color:white; font-weight:700;">Excluir</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ===================== EVENTOS ===================== */
+function attachEvents() {
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  const btnNova = $("#btn-nova-venda");
+  if (btnNova) btnNova.addEventListener("click", () => {
+    state.form = emptyForm();
+    state.editId = null;
+    state.showForm = true;
+    render();
+  });
+
+  $$(".tab-btn").forEach((btn) => btn.addEventListener("click", () => {
+    state.view = btn.dataset.view;
+    render();
+  }));
+
+  const searchInput = $("#search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      state.search = e.target.value;
+      const cursorPos = e.target.selectionStart;
+      render();
+      const newInput = $("#search-input");
+      if (newInput) { newInput.focus(); newInput.setSelectionRange(cursorPos, cursorPos); }
+    });
+  }
+
+  $$(".filter-status-btn").forEach((btn) => btn.addEventListener("click", () => {
+    state.filterStatus = btn.dataset.status;
+    render();
+  }));
+
+  $$(".status-toggle").forEach((el) => el.addEventListener("click", () => {
+    handleStatusToggle(Number(el.dataset.id));
+  }));
+
+  $$(".btn-edit").forEach((btn) => btn.addEventListener("click", () => {
+    const sale = state.sales.find((s) => s.id === Number(btn.dataset.id));
+    if (sale) handleEdit(sale);
+  }));
+
+  $$(".btn-delete").forEach((btn) => btn.addEventListener("click", () => {
+    state.confirmDel = Number(btn.dataset.id);
+    render();
+  }));
+
+  // Modal de formulário
+  const overlay = $("#modal-overlay");
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        state.showForm = false;
+        state.form = emptyForm();
+        state.editId = null;
+        render();
+      }
+    });
+  }
+
+  $$(".form-field").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      state.form[input.dataset.key] = e.target.value;
+      const supportsSelection = input.type !== "date" && input.type !== "number";
+      const cursorPos = supportsSelection ? e.target.selectionStart : null;
+      const key = input.dataset.key;
+      render();
+      const newInput = document.querySelector(`.form-field[data-key="${key}"]`);
+      if (newInput) {
+        newInput.focus();
+        if (supportsSelection) {
+          newInput.setSelectionRange(cursorPos, cursorPos);
+        }
+      }
+    });
+  });
+
+  const formCategoria = $("#form-categoria");
+  if (formCategoria) formCategoria.addEventListener("change", (e) => {
+    state.form.categoria = e.target.value;
+    render();
+  });
+
+  $$(".status-pick-btn").forEach((btn) => btn.addEventListener("click", () => {
+    state.form.status = btn.dataset.status;
+    render();
+  }));
+
+  const btnCancelar = $("#btn-cancelar");
+  if (btnCancelar) btnCancelar.addEventListener("click", () => {
+    state.showForm = false;
+    state.form = emptyForm();
+    state.editId = null;
+    render();
+  });
+
+  const btnSalvar = $("#btn-salvar");
+  if (btnSalvar) btnSalvar.addEventListener("click", handleSave);
+
+  const btnConfirmCancel = $("#btn-confirm-cancel");
+  if (btnConfirmCancel) btnConfirmCancel.addEventListener("click", () => {
+    state.confirmDel = null;
+    render();
+  });
+
+  const btnConfirmDelete = $("#btn-confirm-delete");
+  if (btnConfirmDelete) btnConfirmDelete.addEventListener("click", () => {
+    handleDelete(state.confirmDel);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
