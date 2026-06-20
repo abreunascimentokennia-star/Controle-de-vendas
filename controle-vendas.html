@@ -624,28 +624,6 @@ function atualizarPreview() {
   }
 }
 
-function salvar() {
-  const cliente = document.getElementById('f-cliente').value.trim();
-  const produto = document.getElementById('f-produto').value.trim();
-  const custo = +document.getElementById('f-custo').value;
-  const venda = +document.getElementById('f-venda').value;
-  if (!cliente || !produto || !custo || !venda) { alert('Preencha todos os campos!'); return; }
-  const row = calcRow({
-    data: document.getElementById('f-data').value,
-    cliente, categoria: document.getElementById('f-categoria').value,
-    produto, custoUnit: custo, vendaUnit: venda,
-    quantidade: +document.getElementById('f-qtd').value||1, status: formStatus
-  });
-  if (editandoId !== null) {
-    const idx = vendas.findIndex(x=>x.id===editandoId);
-    vendas[idx] = { ...row, id: editandoId };
-  } else {
-    vendas.push({ ...row, id: nextId++ });
-  }
-  fecharModal();
-  renderCards(); renderLista(); renderMesBar();
-}
-
 function pedirDelete(id) {
   deletandoId = id;
   document.getElementById('confirm-overlay').classList.add('show');
@@ -654,12 +632,6 @@ function pedirDelete(id) {
 function fecharConfirm() {
   document.getElementById('confirm-overlay').classList.remove('show');
   deletandoId = null;
-}
-
-function confirmarDelete() {
-  vendas = vendas.filter(x=>x.id!==deletandoId);
-  fecharConfirm();
-  renderCards(); renderLista(); renderMesBar();
 }
 
 // Fechar overlay clicando fora
