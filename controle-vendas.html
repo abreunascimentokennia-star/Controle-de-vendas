@@ -215,6 +215,7 @@ const state = {
   showForm: false,
   filterStatus: "TODOS",
   filterCat: "TODAS",
+  filterMonth: "TODOS",
   search: "",
   confirmDel: null,
 };
@@ -222,9 +223,27 @@ const state = {
 /* ===================== HELPERS DE ESCAPE ===================== */
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/* ===================== HELPERS DE MÊS ===================== */
+const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function formatMonthLabel(ym) {
+  const [year, month] = ym.split("-");
+  return `${MONTH_NAMES[parseInt(month, 10) - 1]} de ${year}`;
+}
+
+function getMonthOptions() {
+  const months = new Set(state.sales.map((s) => s.data.slice(0, 7)));
+  return Array.from(months).sort().reverse();
+}
+
+function getMonthFilteredSales() {
+  if (state.filterMonth === "TODOS") return state.sales;
+  return state.sales.filter((s) => s.data.slice(0, 7) === state.filterMonth);
+}
+
 /* ===================== DERIVADOS ===================== */
 function getFiltered() {
-  return state.sales.filter((s) => {
+  return getMonthFilteredSales().filter((s) => {
     if (state.filterStatus !== "TODOS" && s.status !== state.filterStatus) return false;
     if (state.filterCat !== "TODAS" && s.categoria !== state.filterCat) return false;
     if (state.search && !s.cliente.toLowerCase().includes(state.search.toLowerCase()) && !s.produto.toLowerCase().includes(state.search.toLowerCase())) return false;
@@ -233,16 +252,17 @@ function getFiltered() {
 }
 
 function getTotals() {
+  const sales = getMonthFilteredSales();
   return {
-    vendaTotal: state.sales.reduce((a, b) => a + b.vendaTotal, 0),
-    lucroTotal: state.sales.reduce((a, b) => a + b.lucro, 0),
-    emAberto: state.sales.filter((s) => s.status === "EM ABERTO" || s.status === "ATRASADO").reduce((a, b) => a + b.vendaTotal, 0),
+    vendaTotal: sales.reduce((a, b) => a + b.vendaTotal, 0),
+    lucroTotal: sales.reduce((a, b) => a + b.lucro, 0),
+    emAberto: sales.filter((s) => s.status === "EM ABERTO" || s.status === "ATRASADO").reduce((a, b) => a + b.vendaTotal, 0),
   };
 }
 
 function getByCategoria() {
   const map = {};
-  state.sales.forEach((s) => {
+  getMonthFilteredSales().forEach((s) => {
     if (!map[s.categoria]) map[s.categoria] = { vendas: 0, lucro: 0, count: 0 };
     map[s.categoria].vendas += s.vendaTotal;
     map[s.categoria].lucro += s.lucro;
@@ -253,7 +273,7 @@ function getByCategoria() {
 
 function getTopClientes() {
   const acc = {};
-  state.sales.forEach((s) => {
+  getMonthFilteredSales().forEach((s) => {
     if (!acc[s.cliente]) acc[s.cliente] = { vendas: 0, count: 0 };
     acc[s.cliente].vendas += s.vendaTotal;
     acc[s.cliente].count += 1;
@@ -331,6 +351,14 @@ function render() {
       </div>
 
       <div class="wrap" style="padding:16px 12px;">
+        <div style="margin-bottom:12px;">
+          <select id="filter-month" style="width:100%; border:1.5px solid #e5e7eb; border-radius:10px; padding:10px 12px; font-size:14px; background:white; color:#1e1e2e; font-weight:600;">
+            <option value="TODOS" ${state.filterMonth === "TODOS" ? "selected" : ""}>📅 Todos os meses</option>
+            ${getMonthOptions().map((ym) => `
+              <option value="${ym}" ${state.filterMonth === ym ? "selected" : ""}>📅 ${formatMonthLabel(ym)}</option>
+            `).join("")}
+          </select>
+        </div>
         <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:16px;">
           ${[
             { label: "Total Vendido", value: fmt(totals.vendaTotal), icon: "💰", color: "#7c3aed" },
@@ -430,7 +458,7 @@ function renderResumo() {
       <div style="background:white; border-radius:12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.06);">
         <div style="font-weight:700; font-size:15px; margin-bottom:12px;">💰 Situação das Cobranças</div>
         ${["PAGO", "EM ABERTO", "ATRASADO"].map((st) => {
-          const group = state.sales.filter((s) => s.status === st);
+          const group = getMonthFilteredSales().filter((s) => s.status === st);
           const total = group.reduce((a, b) => a + b.vendaTotal, 0);
           return `
             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-radius:8px; margin-bottom:6px; background:${STATUS_STYLE[st].bg};">
@@ -614,6 +642,12 @@ function attachEvents() {
     state.filterStatus = btn.dataset.status;
     render();
   }));
+
+  const filterMonth = $("#filter-month");
+  if (filterMonth) filterMonth.addEventListener("change", (e) => {
+    state.filterMonth = e.target.value;
+    render();
+  });
 
   $$(".status-toggle").forEach((el) => el.addEventListener("click", () => {
     handleStatusToggle(Number(el.dataset.id));
